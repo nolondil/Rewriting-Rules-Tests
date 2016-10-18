@@ -7,22 +7,11 @@ import org.scalacheck.Prop
 import org.scalacheck.Prop._
 import org.scalacheck.Properties
 
-
-class Test extends FunSuite with Checkers {
-  test("Random test") {
-    println(Rules)
-    assert(true)
-  }
-
-  test("Test des rules") {
-    assert(Rules.isInstanceOf[Properties])
-    for (p <- Rules.asInstanceOf[Properties].properties) {
-      try {
-        check(p._2)
-      } catch {
-        case e: Exception =>
-          assert(true, p._1)
-      }
-    }
-  }
+trait TestedRules extends TestFunctions {
+  def commitLeft(): Unit = true
+  def commitRight(): Unit = true
+  def checkEffects(): Boolean = true
+  //implicit def genImpure1[T, U]: Gen[ImpureFunction1[T, U]] = true
 }
+
+object TestRule extends Rules.TestSuit with TestedRules

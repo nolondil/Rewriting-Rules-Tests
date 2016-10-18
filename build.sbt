@@ -1,4 +1,4 @@
-name := "Tests Rules"
+name := "Tests-Rules"
 
 version := "1.0"
 
@@ -11,3 +11,4 @@ libraryDependencies += "org.scalameta" %% "scalameta" % "1.1.0"
 
 addCompilerPlugin("org.scalameta" % "paradise" % "3.0.0-M5" cross CrossVersion.full)
 
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "5", "-minSuccessfulTests", "33", "-workers", "1", "-verbosity", "1")

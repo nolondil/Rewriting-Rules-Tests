@@ -1,6 +1,14 @@
 import scala.meta
 import scala.meta._
 import scala.annotation.StaticAnnotation
+import org.scalacheck._
+
+trait TestFunctions {
+  def commitLeft(): Unit
+  def commitRight(): Unit
+  def checkEffects(): Boolean
+  //implicit def genImpure1[T, U]: Gen[ImpureFunction1[T, U]]
+}
 
 class rewrites extends StaticAnnotation {
   inline def apply(defn: Any): Any = meta {
@@ -22,8 +30,12 @@ class rewrites extends StaticAnnotation {
         """
         List(test)
       case other =>
-        List(other)
+        Nil
     }
-    q"object $name extends TestedRules(${name.toString}) { ..$stats1 }"
+    val suitName: Type.Name = Type.Name("TestSuit")
+
+    val stats2 = stats ++ List(q"abstract class $suitName extends Properties(${name.toString}) with TestFunctions { ..$stats1 }")
+
+    q"object $name { ..$stats2 }"
   }
 }
