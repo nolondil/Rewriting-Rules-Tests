@@ -14,8 +14,8 @@ class rewrites extends StaticAnnotation {
   inline def apply(defn: Any): Any = meta {
     val q"object $name { ..$stats }" = defn
     val stats1 = stats.flatMap {
-      case rule @ q"..$mods def $name[..$tparams](...$paramss): $tpe = $body" =>
-        val q"Rewrite(${left: Term}, ${right: Term})" = body
+      case rule @ q"..$mods def $name[..$tparams](...$paramss): $tpe = Rewrite(${left: Term}, ${right: Term})"=>
+        //val q"Rewrite(${left: Term}, ${right: Term})" = body
         val params = paramss.head // TODO
         val test = q"""
           property(${name.toString}) = forAll {
@@ -34,7 +34,9 @@ class rewrites extends StaticAnnotation {
     }
     val suitName: Type.Name = Type.Name("TestSuit")
 
-    val stats2 = stats ++ List(q"abstract class $suitName extends Properties(${name.toString}) with TestFunctions { ..$stats1 }")
+    val properties = stats1
+
+    val stats2 = stats ++ List(q"abstract class $suitName extends Properties(${name.toString}) with TestFunctions { ..$properties }")
 
     q"object $name { ..$stats2 }"
   }

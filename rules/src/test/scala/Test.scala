@@ -6,6 +6,7 @@ import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
 import org.scalacheck.Properties
+import org.scalacheck.Gen
 
 trait TestedRules extends TestFunctions {
   def commitLeft(): Unit = true
@@ -15,3 +16,9 @@ trait TestedRules extends TestFunctions {
 }
 
 object TestRule extends Rules.TestSuit with TestedRules
+object TestRuleInt extends IntRules.TestSuit with TestedRules
+
+object asdas {
+  def main(args: Array[String]): Unit = {
+  }
+}
