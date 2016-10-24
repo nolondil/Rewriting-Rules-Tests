@@ -1,8 +1,8 @@
-import org.scalacheck._
+/*import org.scalacheck._
 import Arbitrary._
 import Gen._
 import Prop._
-
+*/
 object Rewrite {
   def apply(from: Any, to: Any): Unit = ???
 }
