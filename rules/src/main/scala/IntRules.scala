@@ -21,7 +21,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream(iterator).toSeq
+        stream.toSeq
       }
     )
 
@@ -40,7 +40,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream(iterator).toSeq
+        stream.toSeq
       }
     )
 
@@ -59,7 +59,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream(iterator).toSeq
+        stream.toSeq
       }
     )
 
@@ -78,7 +78,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream(iterator).toSeq
+        stream.toSeq
       }
     )
 
@@ -89,7 +89,7 @@ object IntRules {
         f(iterator.next) #:: stream(i + 1)
       else
         Stream.Empty
-    stream(0)(iterator).toSeq
+    stream(0).toSeq
   }
 
   def takeAndMap(xs: Seq[Int], n: Int, f: (Int => Int)) =
@@ -121,7 +121,7 @@ object IntRules {
               Stream.Empty
           }
           else Stream.Empty
-        stream(iterator).toSeq
+        stream.toSeq
       }
     )
 
@@ -143,7 +143,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream(iterator).toSeq
+        stream.toSeq
       }
     )
 
@@ -161,7 +161,7 @@ object IntRules {
               stream(i+1)
           }
           else Stream.Empty
-          stream(0)(iterator).toSeq
+          stream(0).toSeq
       }
     )
 
@@ -181,7 +181,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream(0)(iterator).toSeq
+        stream(0).toSeq
       }
     )
 
