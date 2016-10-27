@@ -9,13 +9,39 @@ object IntRules {
   def filterAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
     Rewrite(
       xs.filter(p).map(f),
-      xs.flatMap(_ match { case x if p(x) => List(f(x)); case _ => Nil })
+      {
+        val iterator = xs.iterator
+        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+          if (iterator.hasNext) {
+            val next = iterator.next
+            if (p(next))
+              f(next) #:: stream
+            else
+              stream
+          } else {
+            Stream.Empty
+          }
+        stream(iterator).toSeq
+      }
     )
 
   def mapAndFilter(xs: Seq[Int], f: (Int => Int), p: (Int => Boolean)) =
     Rewrite(
       xs.map(f).filter(p),
-      xs.flatMap(f(_) match { case y if p(y) => List(y); case _ => Nil  })
+      {
+        val iterator = xs.iterator
+        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+          if (iterator.hasNext) {
+            val next = f(iterator.next)
+            if (p(next))
+              next #:: stream
+            else
+              stream
+          } else {
+            Stream.Empty
+          }
+        stream(iterator).toSeq
+      }
     )
 
   def takeWhileAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
@@ -33,7 +59,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream.toSeq
+        stream(iterator).toSeq
       }
     )
 
@@ -52,7 +78,7 @@ object IntRules {
           } else {
             Stream.Empty
           }
-        stream
+        stream(iterator).toSeq
       }
     )
 
@@ -63,7 +89,7 @@ object IntRules {
         f(iterator.next) #:: stream(i + 1)
       else
         Stream.Empty
-    stream(0).toSeq
+    stream(0)(iterator).toSeq
   }
 
   def takeAndMap(xs: Seq[Int], n: Int, f: (Int => Int)) =
@@ -95,7 +121,29 @@ object IntRules {
               Stream.Empty
           }
           else Stream.Empty
-        stream
+        stream(iterator).toSeq
+      }
+    )
+
+  def filterAndTakeWhile(xs: Seq[Int], ptw: (Int => Boolean), pf: (Int => Boolean)) =
+    Rewrite(
+      xs.filter(pf).takeWhile(ptw),
+      {
+        val iterator = xs.iterator
+        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+          if (iterator.hasNext) {
+            val next = iterator.next
+            if (pf(next))
+              if (ptw(next))
+                next #:: stream
+              else
+                Stream.Empty
+            else
+              stream
+          } else {
+            Stream.Empty
+          }
+        stream(iterator).toSeq
       }
     )
 
@@ -113,8 +161,34 @@ object IntRules {
               stream(i+1)
           }
           else Stream.Empty
-          stream(0)
+          stream(0)(iterator).toSeq
       }
+    )
+
+  def filterAndTake(xs: Seq[Int], n: Int, pf: (Int => Boolean)) =
+    Rewrite(
+      xs.filter(pf).take(n),
+      {
+        val iterator = xs.iterator
+        def stream(i: Int)(implicit iterator: Iterator[Int]): Stream[Int] =
+          if (iterator.hasNext && i < n) {
+            val next = iterator.next
+            if (pf(next)) {
+              next #::stream(i+1)
+            } else {
+              stream(i)
+            }
+          } else {
+            Stream.Empty
+          }
+        stream(0)(iterator).toSeq
+      }
+    )
+
+  def mapAndFoldLeft(xs: Seq[Int], f: (Int => Int), op: ((Int, Int) => Int), initial: Int) =
+    Rewrite(
+      xs.map(f).foldLeft(initial)(op),
+      xs.foldLeft(initial)((a, b) => op(a, f(b)))
     )
 
   def isEmpty(x: Seq[Int]) =
