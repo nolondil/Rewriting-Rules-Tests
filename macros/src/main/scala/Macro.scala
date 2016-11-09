@@ -27,7 +27,21 @@ class rewrites extends StaticAnnotation {
             }
           }
         """
-        List(test)
+        val performance = q"""
+          property(${name.toString + "Performance"}) = forAll {
+            (..$params) => {
+              lazy val left = $left
+              lazy val right = $right              
+              val t0 = System.nanoTime()
+              left
+              val t1 = System.nanoTime()
+              right
+              val t2 = System.nanoTime()
+              (t1 - t0) >= (t2 - t1)
+            }
+          }
+        """
+        List(test, performance)
       case other =>
         Nil
     }

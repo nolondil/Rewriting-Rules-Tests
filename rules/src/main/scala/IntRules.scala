@@ -2,10 +2,11 @@ import dotty.linker._
 
 @rewrites
 object IntRules {
-  def twoMaps(xs: Seq[Int], f1: (Int => Int), f2: (Int => Int)) =
-    Rewrite(xs.map(f1).map(f2),
-      xs.map(x => f2(f1(x))))
-
+  def twoMaps(xs: Seq[Int], f1: Int => Int, f2: Int => Int) =
+    Rewrite(
+      xs.map(f1).map(f2),
+      xs.map(x => f2(f1(x)))
+    )
   def filterAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
     Rewrite(
       xs.filter(p).map(f),
@@ -146,22 +147,22 @@ object IntRules {
         stream.toSeq
       }
     )
-
+  
   def takeAndFilter(xs: Seq[Int], n: Int, pf: (Int => Boolean)) =
     Rewrite(
       xs.take(n).filter(pf),
       {
-        val iterator = xs.iterator
-        def stream(i: Int)(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it : Iterator[Int] = xs.iterator
+        def stream(i: Int, iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext && i < n) {
             val next = iterator.next
             if (pf(next))
-              next #::stream(i+1)
+              next #::stream(i+1, iterator)
             else
-              stream(i+1)
+              stream(i+1, iterator)
           }
           else Stream.Empty
-          stream(0).toSeq
+          stream(0, it).toSeq
       }
     )
 
@@ -169,34 +170,34 @@ object IntRules {
     Rewrite(
       xs.filter(pf).take(n),
       {
-        val iterator = xs.iterator
-        def stream(i: Int)(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(i: Int, iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext && i < n) {
             val next = iterator.next
             if (pf(next)) {
-              next #::stream(i+1)
+              next #::stream(i+1, iterator)
             } else {
-              stream(i)
+              stream(i, iterator)
             }
           } else {
             Stream.Empty
           }
-        stream(0).toSeq
+        stream(0, it).toSeq
       }
     )
-
+  
   def mapAndFoldLeft(xs: Seq[Int], f: (Int => Int), op: ((Int, Int) => Int), initial: Int) =
     Rewrite(
       xs.map(f).foldLeft(initial)(op),
       xs.foldLeft(initial)((a, b) => op(a, f(b)))
     )
-
+  
   def isEmpty(x: Seq[Int]) =
     Rewrite(
       x.length == 0,
       x.isEmpty
     )
-
+  
   def twoDropRights(x: Seq[Int], a: Int, b: Int) =
     Rewrite(
       x.dropRight(a).dropRight(b),
@@ -239,12 +240,19 @@ object IntRules {
         else xs.slice(0, n2 - d1)
       }
     )
+}
 
+object TestIntRules {
   def main(args: Array[String]): Unit = {
+    def f1(i: Int) = 2*i
+    def f2(i: Int) = 4 + i
     val sequence : Seq[Int] = (1 to 10)
-    sequence.isEmpty
     sequence.dropRight(2).dropRight(3)
     sequence.take(2).dropRight(4)
+    sequence.take(2).filter(_ % 2 == 0)
+    sequence.filter(_ % 2 == 0).take(2)
+    println(sequence.map(f1).map(f2))
+    println(sequence.length == 0)
     //List()
     /*List(1,2,3,4).map(x => 2*x).map(x => x + 4)
     List(1,2,3,4).filter(x => x % 2 == 0).map(x => x + 1)
