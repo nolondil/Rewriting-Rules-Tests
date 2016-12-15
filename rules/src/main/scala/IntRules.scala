@@ -2,7 +2,7 @@ import dotty.linker._
 
 @rewrites
 object IntRules {
-  def twoMaps(xs: Seq[Int], f1: Int => Int, f2: Int => Int) =
+  def twoMaps(f1: Int => Int, f2: Int => Int, xs: Seq[Int]) =
     Rewrite(
       xs.map(f1).map(f2),
       xs.map(x => f2(f1(x)))
@@ -11,18 +11,18 @@ object IntRules {
     Rewrite(
       xs.filter(p).map(f),
       {
-        val iterator = xs.iterator
-        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = iterator.next
             if (p(next))
-              f(next) #:: stream
+              f(next) #:: stream(iterator)
             else
-              stream
+              stream(iterator)
           } else {
             Stream.Empty
           }
-        stream.toSeq
+        stream(it).toSeq
       }
     )
 
@@ -30,18 +30,18 @@ object IntRules {
     Rewrite(
       xs.map(f).filter(p),
       {
-        val iterator = xs.iterator
-        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = f(iterator.next)
             if (p(next))
-              next #:: stream
+              next #:: stream(iterator)
             else
-              stream
+              stream(iterator)
           } else {
             Stream.Empty
           }
-        stream.toSeq
+        stream(it).toSeq
       }
     )
 
@@ -49,18 +49,18 @@ object IntRules {
     Rewrite(
       xs.takeWhile(p).map(f),
       {
-        val iterator = xs.iterator
-        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = iterator.next
             if (p(next))
-              f(next) #:: stream
+              f(next) #:: stream(iterator)
             else
               Stream.Empty
           } else {
             Stream.Empty
           }
-        stream.toSeq
+        stream(it).toSeq
       }
     )
 
@@ -68,29 +68,29 @@ object IntRules {
     Rewrite(
       xs.map(f).takeWhile(p),
       {
-        val iterator = xs.iterator
-        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = f(iterator.next)
             if (p(next))
-              next #:: stream
+              next #:: stream(iterator)
             else
               Stream.Empty
           } else {
             Stream.Empty
           }
-        stream.toSeq
+        stream(it).toSeq
       }
     )
 
   private def rewriteTakeMap(xs: Seq[Int], n: Int, f: (Int => Int)) = {
-    val iterator = xs.iterator
-    def stream(i: Int)(implicit iterator: Iterator[Int]): Stream[Int] =
+    val it = xs.iterator
+    def stream(i: Int, iterator: Iterator[Int]): Stream[Int] =
       if (iterator.hasNext && i < n)
-        f(iterator.next) #:: stream(i + 1)
+        f(iterator.next) #:: stream(i + 1, iterator)
       else
         Stream.Empty
-    stream(0).toSeq
+    stream(0, it).toSeq
   }
 
   def takeAndMap(xs: Seq[Int], n: Int, f: (Int => Int)) =
@@ -109,20 +109,20 @@ object IntRules {
     Rewrite(
       xs.takeWhile(ptw).filter(pf),
       {
-        val iterator = xs.iterator
-        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = iterator.next
             if (ptw(next))
               if (pf(next))
-                next #:: stream
+                next #:: stream(iterator)
               else
-                stream
+                stream(iterator)
             else
               Stream.Empty
           }
           else Stream.Empty
-        stream.toSeq
+        stream(it).toSeq
       }
     )
 
@@ -130,21 +130,21 @@ object IntRules {
     Rewrite(
       xs.filter(pf).takeWhile(ptw),
       {
-        val iterator = xs.iterator
-        def stream(implicit iterator: Iterator[Int]): Stream[Int] =
+        val it = xs.iterator
+        def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = iterator.next
             if (pf(next))
               if (ptw(next))
-                next #:: stream
+                next #:: stream(iterator)
               else
                 Stream.Empty
             else
-              stream
+              stream(iterator)
           } else {
             Stream.Empty
           }
-        stream.toSeq
+        stream(it).toSeq
       }
     )
   
@@ -242,7 +242,7 @@ object IntRules {
     )
 }
 
-object TestIntRules {
+/*object TestIntRules {
   def main(args: Array[String]): Unit = {
     def f1(i: Int) = 2*i
     def f2(i: Int) = 4 + i
@@ -253,9 +253,9 @@ object TestIntRules {
     sequence.filter(_ % 2 == 0).take(2)
     println(sequence.map(f1).map(f2))
     println(sequence.length == 0)
-    //List()
+    //List()*/
     /*List(1,2,3,4).map(x => 2*x).map(x => x + 4)
     List(1,2,3,4).filter(x => x % 2 == 0).map(x => x + 1)
     List(1,2,3,4).dropRight(1).dropRight(1)*/
-  }
-}
+//  }
+//}

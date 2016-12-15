@@ -3,13 +3,13 @@ import Arbitrary._
 import Gen._
 import Prop._
 */
-object Rewrite {
+/*object Rewrite {
   def apply(from: Any, to: Any): Unit = ???
 }
 
 trait IsPure[T]
 
-@rewrites
+//@rewrites
 object Rules {
   def isEmpty(x: Seq[Int]) =
     Rewrite(x.length == 0,
@@ -27,4 +27,4 @@ object Rules {
   def twoFilters(x: List[Int], a: Int => Boolean, b: Int => Boolean)(implicit apure: IsPure[a.type]) =
     Rewrite(x.filter(a).filter(b),
             x.filter(x => a(x) && b(x)))
-}
+}*/

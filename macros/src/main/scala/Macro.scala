@@ -4,26 +4,44 @@ import scala.annotation.StaticAnnotation
 import org.scalacheck._
 
 trait TestFunctions {
+  def cleanUp(): Unit
   def commitLeft(): Unit
   def commitRight(): Unit
   def checkEffects(): Boolean
-  //implicit def genImpure1[T, U]: Gen[ImpureFunction1[T, U]]
 }
 
 class rewrites extends StaticAnnotation {
   inline def apply(defn: Any): Any = meta {
+    /*def createSubClass(args: scala.collection.immutable.Seq[scala.meta.Type.Arg], ret: scala.meta.Type, functionName: String) = {
+      val listType = args.mkString(",")
+      val extensionTpe = t"($listType) => $ret"
+      val retTpe = ret.toString
+      val listArgs = (1 to args.length).zip(args).map(_ match { case (n, tpe) => Term.Param(Nil, Term.Name("x"+n), Some(tpe), None)}).toSeq
+      val listArgsName = listArgs.map(_.name.toString).mkString(",")
+      val ctorParams = scala.collection.immutable.Seq(Term.Param(Nil, Term.Name("x"), Some(t"String"), None), Term.Param(Nil, Term.Name("f"), Some(extensionTpe), None))
+      val impureName : Type.Name = Type.Name(functionName + "Impure")
+      val n = args.size
+      q"""
+        class $impureName (..$ctorParams) extends (($listType) => $retTpe) {
+          override def apply(..$listArgs) = {
+            f($listArgsName)
+          }
+        }
+      """
+    }*/
     val q"object $name { ..$stats }" = defn
     val stats1 = stats.flatMap {
       case rule @ q"..$mods def $name[..$tparams](...$paramss): $tpe = Rewrite(${left: Term}, ${right: Term})"=>
         val params = paramss.head // TODO
         val test = q"""
-          property(${name.toString}) = forAll {
+          property(${name.toString + "Validity"}) = forAll {
             (..$params) => {
+              this.cleanUp()
               val left = $left
               this.commitLeft()
               var right = $right
               this.commitRight()
-              (left == right) && this.checkEffects()
+              this.checkEffects() && left == right
             }
           }
         """
@@ -37,7 +55,10 @@ class rewrites extends StaticAnnotation {
               val t1 = System.nanoTime()
               right
               val t2 = System.nanoTime()
-              (t1 - t0) >= (t2 - t1)
+              val test = 
+                if ((t1 - t0) >= (t2 - t1)) "faster"
+                else "slower"
+              collect(test)(true)
             }
           }
         """

@@ -21,6 +21,9 @@ object MyBuild extends Build {
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.0",
     libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.2",
     libraryDependencies += "org.scalameta" %% "scalameta" % "1.1.0",
-    addCompilerPlugin("org.scalameta" % "paradise" % "3.0.0-M5" cross CrossVersion.full)
-    ).dependsOn(macros).dependsOn(dotty)
+    addCompilerPlugin("org.scalameta" % "paradise" % "3.0.0-M5" cross CrossVersion.full),
+    testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "5", "-minSuccessfulTests", "200", "-workers", "1", "-verbosity", "1")
+  ).dependsOn(macros).dependsOn(dotty)
+
+  parallelExecution in Test in rules := false
 }
