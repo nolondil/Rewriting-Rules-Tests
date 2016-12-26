@@ -2,12 +2,18 @@ import dotty.linker._
 
 @rewrites
 object IntRules {
-  def twoMaps(f1: Int => Int, f2: Int => Int, xs: Seq[Int]) =
+  def testMap(f1: Int => Int, xs: Seq[Int]) =
+    Rewrite(
+      xs.map(f1),
+      xs.map(f1)
+    )
+
+  /*def twoMaps(f1: Int => Int, f2: Int => Int, xs: Seq[Int]) =
     Rewrite(
       xs.map(f1).map(f2),
       xs.map(x => f2(f1(x)))
-    )
-  def filterAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
+    )*/
+ /* def filterAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
     Rewrite(
       xs.filter(p).map(f),
       {
@@ -239,7 +245,7 @@ object IntRules {
         if (d1 > n2) Nil
         else xs.slice(0, n2 - d1)
       }
-    )
+    )*/
 }
 
 /*object TestIntRules {

@@ -19,7 +19,7 @@ trait TestedRules extends TestFunctions {
 
 object TestRuleInt extends IntRules.TestSuit with TestedRules
 
-trait TestImpure extends TestFunctions {
+/*trait TestImpure extends TestFunctions {
   var currentLeft: Seq[String] = Nil
   var currentRight: Seq[String] = Nil
   def cleanUp() = {
@@ -62,4 +62,4 @@ class TestRules extends FunSuite with Checkers {
       }*/
     }
   }
-}
+}*/
