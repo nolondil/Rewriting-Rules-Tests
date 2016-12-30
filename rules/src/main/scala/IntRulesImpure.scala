@@ -6,7 +6,7 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalacheck.Test
 
-@rewrites
+//@rewrites
 object IntRulesImpure {
   var buff = scala.collection.mutable.ListBuffer.empty[String]
 

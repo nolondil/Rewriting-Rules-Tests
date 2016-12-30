@@ -17,49 +17,8 @@ trait TestedRules extends TestFunctions {
   def checkEffects(): Boolean = true
 }
 
-object TestRuleInt extends IntRules.TestSuit with TestedRules
+object TestVal extends IntRules.ValidityTests
 
-/*trait TestImpure extends TestFunctions {
-  var currentLeft: Seq[String] = Nil
-  var currentRight: Seq[String] = Nil
-  def cleanUp() = {
-    IntRulesImpure.emptyBuff
-  }
-  def commitLeft() = {
-    currentLeft = IntRulesImpure.buff.toSeq
-    IntRulesImpure.emptyBuff
-  }
-  def commitRight() = {
-    currentRight = IntRulesImpure.buff.toSeq
-    IntRulesImpure.emptyBuff  
-  }
-  def checkEffects() = {
-    if (currentLeft != currentRight) {
-      println("left: " + currentLeft)
-      println("right: " + currentRight)
-    }
-    //(currentLeft.isEmpty && currentRight.isEmpty) ||
-    currentLeft == currentRight
-    //(currentLeft.length == 2 && currentLeft == currentRight)
-  }
-}
+object TestSpeed extends IntRules.EfficiencyTests
 
-
-class TestRules extends FunSuite with Checkers {
-  object TestIntRulesImpure extends IntRulesImpure.TestSuit with TestImpure  
-  test("Random test") {
-    assert(true)
-  }
-
-  test("Test des rules") {
-    assert(TestIntRulesImpure.isInstanceOf[Properties])
-    for (p <- TestIntRulesImpure.asInstanceOf[Properties].properties) {
-      //try {
-        check(p._2)
-      /*} catch {
-        case _ : Throwable =>
-          assert(false, p._1)
-      }*/
-    }
-  }
-}*/
+object TestEffects extends IntRules.FunctionImpurityTests
