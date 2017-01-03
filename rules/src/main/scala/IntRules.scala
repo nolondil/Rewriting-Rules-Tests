@@ -3,12 +3,12 @@ import dotty.linker._
 @rewrites
 object IntRules {
 
-  /*def twoMaps(f1: Int => Int, f2: Int => Int, xs: Seq[Int]) =
+  def twoMaps(f1: Int => Int, f2: Int => Int, xs: Seq[Int]) =
     Rewrite(
       xs.map(f1).map(f2),
       xs.map(x => f2(f1(x)))
     )
-  def filterAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
+  /*def filterAndMap(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
     Rewrite(
       xs.filter(p).map(f),
       xs.iterator.filter(p).map(f).toVector
@@ -29,24 +29,25 @@ object IntRules {
   def mapAndTakeWhile(xs: Seq[Int], p: (Int => Boolean), f: (Int => Int)) =
     Rewrite(
       xs.map(f).takeWhile(p),
-      xs.iterator.map(f).takeWhile(p).toVector
-      /*{
+      //xs.iterator.map(f).takeWhile(p).toVector
+      {
         val it = xs.iterator
         def stream(iterator: Iterator[Int]): Stream[Int] =
           if (iterator.hasNext) {
             val next = f(iterator.next)
             if (p(next))
               next #:: stream(iterator)
-            else
+            else {
               while (iterator.hasNext) {
                 val discardedNext = f(iterator.next)
               }
               Stream.Empty
+            }
           } else {
             Stream.Empty
           }
         stream(it).toVector
-      }*/
+      }
     )
 
   /*private def rewriteTakeMap(xs: Seq[Int], n: Int, f: (Int => Int)) = {

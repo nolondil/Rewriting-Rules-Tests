@@ -13,6 +13,7 @@ trait TestFunctions {
 class rewrites extends StaticAnnotation {
 
   inline def apply(defn: Any): Any = meta {
+
     trait TestCases
     case class GeneratedTest(val validity: Stat, val efficiency: Stat, val functionImpurity: scala.collection.immutable.Seq[Stat], val generalImpurity: Stat) extends TestCases
     object EmptyTests extends TestCases
@@ -25,7 +26,60 @@ class rewrites extends StaticAnnotation {
         }
       }
     }
-    
+
+    val impureTypes : scala.collection.mutable.Map[String, Type.Name] = scala.collection.mutable.Map[String, Type.Name]()
+    val impureTypesDefs : scala.collection.mutable.ListBuffer[Stat] = scala.collection.mutable.ListBuffer[Stat]()
+
+    def createImpureSubtype(tpe: Type.Function) : Type.Name = {
+      val tpeName = Type.fresh("Impure")
+      val newTpeArgs = List(tpeName)
+      val funCtorCall = ("(" + tpe.toString + ")").parse[Ctor.Call].get
+      val ctorArgs = List(param"val fun : $tpe")
+      /*val buffer = q"var buffer : _root_.scala.collection.mutable.ListBuffer[String]"
+      val name = q"var name : String"*/
+      val addToBuffer = q"buffer.append(name)"
+      val (applyParams, args) = (((tpe.params) zip (1 to tpe.params.length)) map { 
+          case (t, i) => val name = Term.Name("x" + i);  val retArg : Term.Arg = arg"$name"; (param"$name : $t", retArg) 
+        }).unzip
+      val applyFunction = q"fun(...${scala.collection.immutable.Seq(args)})"
+      val redefApply = q"def apply(..$applyParams) : ${tpe.res} = {..${List(addToBuffer, applyFunction)}}"
+      val template = template"..${List(funCtorCall)} { ..${List(redefApply)} }"
+      val caseClass = q"""case class $tpeName (val fun: $tpe, var buffer : _root_.scala.collection.mutable.ListBuffer[String] = _root_.scala.collection.mutable.ListBuffer[String](), var name: String = "") extends $template"""
+      val genTArgs = List(tpe)
+      val genTpe = t"Gen[..$newTpeArgs]"
+      val genFun = q"arbitrary[..$genTArgs]"
+      val enumFun = enumerator"fun <- $genFun"
+      val createInstance = ctor"${Ctor.Ref.Name(tpeName.toString)}(fun)"
+      val genName = Pat.fresh(tpeName.toString + "Gen")
+      val valGen = q"val $genName : $genTpe = for {..${List(enumFun)}} yield $createInstance"
+      val arbName = Pat.fresh(tpeName.toString + "Arb")
+      val arbTpe = t"Arbitrary[..$newTpeArgs]"
+      val argGen = arg"${genName.name}"
+      val createArb = ctor"Arbitrary($argGen)"
+      val lazyArb = q"implicit lazy val $arbName : $arbTpe = $createArb"
+      impureTypes(tpe.toString) = tpeName
+      impureTypesDefs.append(caseClass, valGen, lazyArb)
+      return tpeName 
+    }
+
+    def handleTpFunction(tpe: Type.Function) : Type.Name = {
+      impureTypes.get(tpe.toString) match {
+        case Some(tpName : Type.Name) => tpName
+        case None => createImpureSubtype(tpe)
+      }
+    }
+
+    def bind(paramName: Term.Param.Name, tpName : Type.Name) : Term.Name => (Term.Param, scala.collection.immutable.Seq[Stat]) = {
+      val newParam = param"$paramName : ${Some(tpName)}"
+      val paramAsTerm : Term  = Term.Name(paramName.toString)
+      val bindName = q"$paramAsTerm.name = ${paramName.toString}"
+      def bindAll(bufferName: Term.Name) : (Term.Param, scala.collection.immutable.Seq[Stat]) = {
+        val bindBuffer = q"$paramAsTerm.buffer = $bufferName"
+        (newParam, scala.collection.immutable.Seq(bindName, bindBuffer))
+      }
+      bindAll
+    }
+
     def createSubPossibilities(
       currentNames: Seq[String],
       left: Seq[Term.Param],
@@ -43,33 +97,38 @@ class rewrites extends StaticAnnotation {
           current.decltpe match {
           case Some(tpe: Type.Function) => {
             val name = current.name
+            val tpName= handleTpFunction(tpe)
+            val defs = bind(current.name, tpName)
             def unchanged(n: Term.Name) : (Term.Param, scala.collection.immutable.Seq[Stat]) = (current, Nil)
             createSubPossibilities(
               currentNames,
-              leftAfter, newDefinitions :+ (unchanged _)
+              leftAfter,
+              newDefinitions :+ (unchanged _)
             ) #::: 
-            createSubPossibilities(
+            createSubPossibilities(           
               currentNames :+ name.toString,
               leftAfter,
-              newDefinitions :+ createNewDefinitions(tpe, name)
+              newDefinitions :+ defs
             )
           }
           case Some(Type.Apply(tpe, args)) if findFunction.pattern.matcher(tpe.toString).matches => {
             args match {
               case (argTpes :+ retTpe) => {
-                val funTpe = Type.Function(argTpes, retTpe)
+                val tpe = Type.Function(argTpes, retTpe)
                 val name = current.name
-                def unchanged(n: Term.Name) : (Term.Param, scala.collection.immutable.Seq[Stat]) = (current, Nil)              
+                val tpName= handleTpFunction(tpe)
+                val defs = bind(current.name, tpName)
+                def unchanged(n: Term.Name) : (Term.Param, scala.collection.immutable.Seq[Stat]) = (current, Nil)
                 createSubPossibilities(
                   currentNames,
                   leftAfter,
                   newDefinitions :+ (unchanged _)
                 ) #::: 
-                createSubPossibilities(
+                createSubPossibilities(         
                   currentNames :+ name.toString,
                   leftAfter,
-                  newDefinitions :+ createNewDefinitions(funTpe, name)
-                )        
+                  newDefinitions :+ defs
+                )
               }
             }
           }
@@ -84,41 +143,9 @@ class rewrites extends StaticAnnotation {
     def createImpurePossibilities(params : Seq[Term.Param]) : Stream[(Seq[String], scala.collection.immutable.Seq[(Term.Name => (Term.Param, scala.collection.immutable.Seq[Stat]))])] = {
       createSubPossibilities(Nil, params, Nil)
     }
-
-    def createNewDefinitions(funTpe : Type.Function, name: Term.Param.Name) : Term.Name => (Term.Param, scala.collection.immutable.Seq[Stat]) = {
-      def retFun(bufferName: Term.Name): (Term.Param, scala.collection.immutable.Seq[Stat]) = {
-        val subTypeName = Type.fresh("I" + name + "Impure")
-        val newParam = param"$name : $subTypeName"
-        val newTpeArgs = List(subTypeName)
-        val genTArgs = List(funTpe)
-        val genTpe = t"Gen[..$newTpeArgs]"
-        val genFun = q"arbitrary[..$genTArgs]"
-        val enumFun = enumerator"fun <- $genFun"
-        val createInstance = ctor"${Ctor.Ref.Name(subTypeName.toString)}(fun)"
-        val genName = Pat.fresh(subTypeName.toString + "Gen")
-        val valGen = q"val $genName : $genTpe = for {..${List(enumFun)}} yield $createInstance"
-        val arbName = Pat.fresh(subTypeName.toString + "Arb")
-        val arbTpe = t"Arbitrary[..$newTpeArgs]"
-        val argGen = arg"${genName.name}"
-        val createArb = ctor"Arbitrary($argGen)"
-        val lazyArb = q"implicit lazy val $arbName : $arbTpe = $createArb"
-        val ctorArgs = List(param"val fun : $funTpe")
-        val funCtorCall = ("(" + funTpe.toString + ")").parse[Ctor.Call].get
-        val (applyParams, args) = (((funTpe.params) zip (1 to funTpe.params.length)) map { 
-          case (t, i) => val name = Term.Name("x" + i);  val retArg : Term.Arg = arg"$name"; (param"$name : $t", retArg) 
-        }).unzip
-        val addToBuffer = q"$bufferName.append(${name.toString})"
-        val applyFunction = q"fun(...${scala.collection.immutable.Seq(args)})"
-        val redefApply = q"def apply(..$applyParams) : ${funTpe.res} = {..${List(addToBuffer, applyFunction)}}"
-        val template = template"..${List(funCtorCall)} { ..${List(redefApply)} }"
-        val caseClass = q"""case class $subTypeName (val fun: $funTpe) extends $template"""
-        (newParam, List(caseClass, valGen, lazyArb))
-      }
-      retFun
-    }
-
+    
     val q"object $name { ..$stats }" = defn
-    val (statsValidity, statsEfficiency, statsFunctionImpurity, statsGeneralImpurity) = stats.map({
+    val (statsValidity, statsEfficiency, statsFunctionImpurity, statsGeneralImpurity) : (scala.collection.immutable.Seq[Stat], scala.collection.immutable.Seq[Stat], scala.collection.immutable.Seq[Stat], scala.collection.immutable.Seq[Stat]) = stats.map({
       case rule @ q"..$mods def $name[..$tparams](...$paramss): $tpe = Rewrite(${left: Term}, ${right: Term})"=>
         val params = paramss.head // TODO
         val test = q"""
@@ -149,7 +176,9 @@ class rewrites extends StaticAnnotation {
             }
           }
         """
-        val impureTest = createImpurePossibilities(params).flatMap {
+        val impureTestDefs :  Stream[(Seq[String], scala.collection.immutable.Seq[(Term.Name => (Term.Param, scala.collection.immutable.Seq[Stat]))])] = createImpurePossibilities(params)
+ 
+        val impureTest = (impureTestDefs.flatMap {
           case (names, defs) => {
             val bufferName = Pat.fresh("buffer")
             val bufferDecl = q"var $bufferName = _root_.scala.collection.mutable.ListBuffer.empty[String]"
@@ -158,19 +187,20 @@ class rewrites extends StaticAnnotation {
             val impureTest = q"""
               property(${name.toString + "{" + names.mkString("+")  + "}Impures"}) = forAll {
                 (..$args) => {
+                  { ..$allDefs }                  
+                  ${bufferName.name}.clear                                  
                   val left = $left
                   val leftInfos = ${bufferName.name}.toList
-                  ${bufferName.name} = scala.collection.mutable.ListBuffer.empty[String]
+                  ${bufferName.name}.clear                                  
                   val right = $right
                   val rightInfos = ${bufferName.name}.toList
-                  ${bufferName.name} = scala.collection.mutable.ListBuffer.empty[String]
                   leftInfos == rightInfos
                 }
               }
             """
-            List(bufferDecl) ++ (allDefs :+ impureTest)
+            List(bufferDecl, impureTest)
           }
-        }
+        })
         val generalImpureTest = q"""
           property(${name.toString + "ImpureGeneral"}) = forAll { (..$params) => 
             this.cleanUp()
@@ -201,11 +231,20 @@ class rewrites extends StaticAnnotation {
                                 q"""abstract class $efficiencyName extends org.scalacheck.Properties(${name.toString + "Efficiency"})
                                 { ..$statsEfficiency }""",
                                 q"""class $functionImpurityName extends org.scalacheck.Properties(${name.toString + "FunctionImpurity"})
-                                { ..${statsFunctionImpurity.toVector} }""",
+                                { ..${scala.collection.immutable.Seq(impureTypesDefs:_*) ++ statsFunctionImpurity.toVector} }""",
                                 q"""abstract class $generalImpurityName extends org.scalacheck.Properties(${name.toString + "GeneralImpurity"}) with TestFunctions
                                 { ..$statsGeneralImpurity }""")
 
     val rewritten = q"object $name { ..$stats2 }"
+
+    import scala.io._
+    import java.io._
+
+    val file = new File("withAzgaga.scala")
+    val fw = new FileWriter(file)
+    fw.write(rewritten.toString)
+    fw.close
+
     rewritten
   }
 }
