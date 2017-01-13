@@ -17,7 +17,7 @@ trait TestedRules extends TestFunctions {
   def checkEffects(): Boolean = true
 }
 
-object TestVal extends IntRules.ValidityTests
+object TestVal extends IntRules.CorrectnessTests
 
 object TestSpeed extends IntRules.EfficiencyTests
 
