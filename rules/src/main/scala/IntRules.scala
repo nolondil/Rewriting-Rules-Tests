@@ -3,6 +3,17 @@ import dotty.linker._
 @rewrites
 object IntRules {
 
+  def mapAndTake2(xs: Seq[Int], f: (Int => Int), n: Int) =
+    Rewrite(
+      xs.map(f).take(n),
+      {
+        val it = xs.iterator
+        val ret = it.map(f).take(n).toVector
+        it.map(f).toVector
+        ret
+      }
+    )
+
   def twoMaps(f1: Int => Int, f2: Int => Int, xs: Seq[Int]) =
     Rewrite(
       xs.map(f1).map(f2),

@@ -4,10 +4,14 @@ import scala.annotation.StaticAnnotation
 import org.scalacheck._
 
 trait TestFunctions {
+  // Called at the start of the test
   def cleanUp(): Unit
+  // Meant to observe the side effects of "from" (left)
   def commitLeft(): Unit
+  // Meant to observe the side effects of "to" (right)
   def commitRight(): Unit
-  def checkEffects(): Boolean
+  // Verify the state of side effects from both sides
+  def checkEffects(): Prop
 }
 
 class rewrites extends StaticAnnotation {
@@ -290,8 +294,40 @@ class rewrites extends StaticAnnotation {
           val correctness = q"""
             property(${name.toString + "Correctness"}) = forAll {
               (..$params) => {
-                $left == $right  
+                $left =? $right  
               }
+            }
+          """
+          
+          val otherEfficiency = q"""
+            property(${name.toString + "Efficiency"}) = {
+              val collectSpeed = 
+                forAll {
+                  (..$params) => {
+                    val t0 = System.nanoTime()
+                    val left = $left
+                    val t1 = System.nanoTime()
+                    val speedOriginal = t1 - t0
+                    val right = $right
+                    val t2 = System.nanoTime()
+                    val speedSubstituing = t2 - t1
+                    collect(speedOriginal, speedSubstituing)(true)
+                  }
+                }
+
+              val nTries = 100
+              val speeds = for (i <- 0 to nTries)
+              yield collectSpeed(Gen.Parameters.default).collected.head
+              val improvements = speeds.map {
+                case result => 
+                  val castedResult = result.asInstanceOf[(Long, Long)]
+                  (castedResult._1 - castedResult._2).toDouble / castedResult._1.toDouble
+              }
+              val average = improvements.sum / improvements.length
+              val sorted = improvements.sorted
+              val mean = sorted(nTries/2)
+              val sd = Math.sqrt(sorted.map(x => (x - average)*(x - average)).sum)
+              collect("average: " + average,"mean: " + mean, "Standard deviation: " + sd)(true)
             }
           """
 
@@ -334,7 +370,7 @@ class rewrites extends StaticAnnotation {
                       ${bufferName.name}.clear                                  
                       val right = $right
                       val rightInfos = ${bufferName.name}.toList
-                      leftInfos == rightInfos
+                      leftInfos =? rightInfos
                   }
               """
               List(bufferDecl, impureTest)
@@ -356,7 +392,7 @@ class rewrites extends StaticAnnotation {
           
           GeneratedTest(
             correctness,
-            efficiency,
+            otherEfficiency,
             functionImpurities,
             userDefinedImpurity
           )
@@ -364,26 +400,26 @@ class rewrites extends StaticAnnotation {
         EmptyTests
     }).foldLeft((Seq[Stat](), Seq[Stat](), Seq[Stat](), Seq[Stat]()))(aggregateTest)
 
-    val correctness: Type.Name = Type.Name("CorrectnessTests")
-    val efficiency: Type.Name = Type.Name("EfficiencyTests")
-    val functionImpurity: Type.Name = Type.Name("FunctionImpurityTests")
-    val generalImpurity: Type.Name = Type.Name("GeneralImpurityTests")
+    val correctness: Type.Name = Type.Name("Correctness")
+    val efficiency: Type.Name = Type.Name("Efficiency")
+    val functionImpurity: Type.Name = Type.Name("FunctionSideEffects")
+    val generalImpurity: Type.Name = Type.Name("GeneralSideEffects")
 
     val statsWithTest = stats ++ 
       List(q"import org.scalacheck._",
            q"import Arbitrary._",
            q"import Gen._",
            q"import Prop._",
-           q"""abstract class $correctness extends Properties(${name.toString + "Correctness"})
+           q"""class $correctness extends Properties(${name.toString + "Correctness"})
               { ..$statsValidity }
            """,
-           q"""abstract class $efficiency extends Properties(${name.toString + "Efficiency"})
+           q"""class $efficiency extends Properties(${name.toString + "Efficiency"})
               { ..$statsEfficiency }
            """,
-           q"""class $functionImpurity extends Properties(${name.toString + "FunctionImpurity"})
+           q"""class $functionImpurity extends Properties(${name.toString + "FunctionSideEffects"})
               { ..${Seq(impureTypesDefs:_*) ++ statsFunctionImpurity.toVector} }
            """,
-           q"""abstract class $generalImpurity extends Properties(${name.toString + "GeneralImpurity"}) with TestFunctions
+           q"""abstract class $generalImpurity extends Properties(${name.toString + "GeneralSideEffects"}) with TestFunctions
               { ..$statsGeneralImpurity }
            """
            )
