@@ -67,6 +67,51 @@ class rewrites extends StaticAnnotation {
         }
       }
     }
+
+    def generateSpeedTest(
+      params: Seq[Term.Param],
+      leftComputation: Term,
+      rightComputation: Term
+    ) : Seq[Stat] = {
+      val valDefs = params.map {
+        case Term.Param(_, name, decltpe, _) => {
+          val valName = Pat.Var.Term(Term.Name(name.toString))
+          val valTpe = decltpe.get.toString.parse[Type].get
+          q"val $valName = arbitrary[$valTpe].sample.get"
+        }
+      }
+      val checks = Seq(
+        q"val t0 = System.nanoTime()",
+        q"val discardedLeft = $leftComputation",
+        q"val t1 = System.nanoTime()",
+        q"val discardedRight = $rightComputation",
+        q"val t2 = System.nanoTime()",
+        q"val leftTime = t1 - t0",
+        q"val rightTime = t2 - t1",
+        q"val minTime = Math.min(leftTime, rightTime)",
+        q"val minMeasurableTime = 50000",
+        q"""val improvement = if (minTime < minMeasurableTime) {
+          val iterations = (minTime/minMeasurableTime).toInt
+          val t0It = System.nanoTime()
+          for (_ <- 1 to iterations) {
+            $leftComputation
+          }
+          val t1It = System.nanoTime()
+          for (_ <- 1 to iterations) {
+            $rightComputation
+          }
+          val t2It = System.nanoTime()
+          val leftTimeIt = t1It - t0It
+          val rightTimeIt = t2It - t1It
+          leftTimeIt.toDouble/rightTimeIt.toDouble
+        } else {
+          leftTime.toDouble/rightTime.toDouble
+        }
+        """,
+        q"improvement"
+      )
+      valDefs ++ checks
+    }
     
     // Attributes names for all impure classes
     val funName = Term.Name("fun")
@@ -118,9 +163,9 @@ class rewrites extends StaticAnnotation {
       
       // Call needed for the redefinition of the apply method
       // Buffer manipulation
-      val addToBuffer = q"$bufferName.append($effectName)"
+      val addToBuffer = q"""$bufferName.append($effectName + "(" + List(..${args}).mkString(", ")  + ")")"""
       // Call to the function
-      val applyFunction = q"$funName(...${scala.collection.immutable.Seq(args)})"
+      val applyFunction = q"$funName(...${Seq(args)})"
       // New apply method
       val redefApply = q"""
         def apply(..$applyParams) : ${tpe.res} = {
@@ -276,7 +321,7 @@ class rewrites extends StaticAnnotation {
     }
     
     // deconstruction of the object into its syntax tree
-    val q"object $name { ..$stats }" = defn
+    val q"object $name extends { ..$parentClass } with ..$traits { ..$stats }" = defn
 
     // creation of all tests
     val (
@@ -296,6 +341,22 @@ class rewrites extends StaticAnnotation {
               (..$params) => {
                 $left =? $right  
               }
+            }
+          """
+
+          val thirdEfficiency = q"""
+            property(${name.toString + "Efficiency"}) = {
+              val nTries = 100
+              val improvements = (0 to nTries).map(i => {
+                ..${generateSpeedTest(params, left, right)}
+              }).toList
+              val average = improvements.sum / improvements.length
+              val sorted = improvements.sorted
+              val median = sorted(nTries/2)
+              val sd = Math.sqrt((sorted.map(x => (x - average)*(x - average)).sum)/(1 + nTries).toDouble)
+              val worst = sorted.head
+              val best = sorted.last
+              collect("Best: " + "%.3f".format(best), " worst: " +"%.3f".format(worst), " avg: " + "%.3f".format(average)," median: " + "%.3f".format(median), " Stddev: " + "%.3f".format(sd))(true)
             }
           """
           
@@ -321,13 +382,15 @@ class rewrites extends StaticAnnotation {
               val improvements = speeds.map {
                 case result => 
                   val castedResult = result.asInstanceOf[(Long, Long)]
-                  (castedResult._1 - castedResult._2).toDouble / castedResult._1.toDouble
+                  (castedResult._2).toDouble / castedResult._1.toDouble
               }
               val average = improvements.sum / improvements.length
               val sorted = improvements.sorted
-              val mean = sorted(nTries/2)
-              val sd = Math.sqrt(sorted.map(x => (x - average)*(x - average)).sum)
-              collect("average: " + average,"mean: " + mean, "Standard deviation: " + sd)(true)
+              val median = sorted(nTries/2)
+              val sd = Math.sqrt((sorted.map(x => (x - average)*(x - average)).sum)/nTries.toDouble)
+              val worst = sorted.head
+              val best = sorted.last
+              collect("Best: " + best, " worst: " + worst, " avg: " + average," median: " + median, " Stddev: " + sd)(true)
             }
           """
 
@@ -392,7 +455,7 @@ class rewrites extends StaticAnnotation {
           
           GeneratedTest(
             correctness,
-            otherEfficiency,
+            thirdEfficiency,
             functionImpurities,
             userDefinedImpurity
           )

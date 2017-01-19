@@ -17,6 +17,7 @@ object TestEfficiency extends Rules.Efficiency
 
 object TestEffects extends Rules.FunctionSideEffects
 
+object TestEffectsBad extends BadExamples.FunctionSideEffects
 
 class TestImpure extends FunSuite with Checkers {
   object TestGeneralImpurity extends IntRulesImpure.GeneralSideEffects {
