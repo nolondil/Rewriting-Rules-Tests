@@ -2,6 +2,15 @@ import dotty.linker._
 
 @rewrites
 object Rules {
+  /*def slowTwoMaps(xs: Seq[Int], f1: (Int => Int), f2: (Int => Int)) =
+    Rewrite(
+      xs.map(f1).map(f2),
+      {
+        Thread.sleep(100)
+        xs.map(f1).map(f2)
+      }
+    )*/
+
   def wrongToMap(xs: Seq[Int], f1: (Int => Int), f2: (Int => Int)) =
     Rewrite(
       xs.map(f1).map(f2),
@@ -33,7 +42,7 @@ object Rules {
       xs.iterator.take(n).map(f).toSeq
     )
 
-    def mapAndTake2(xs: Seq[Int], f: (Int => Int), n: Int) =
+  def mapAndTake2(xs: Seq[Int], f: (Int => Int), n: Int) =
     Rewrite(
       xs.map(f).take(n),
       {

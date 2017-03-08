@@ -349,14 +349,19 @@ class rewrites extends StaticAnnotation {
               val nTries = 100
               val improvements = (0 to nTries).map(i => {
                 ..${generateSpeedTest(params, left, right)}
-              }).toList
+              })
               val average = improvements.sum / improvements.length
               val sorted = improvements.sorted
               val median = sorted(nTries/2)
               val sd = Math.sqrt((sorted.map(x => (x - average)*(x - average)).sum)/(1 + nTries).toDouble)
               val worst = sorted.head
               val best = sorted.last
-              collect("Best: " + "%.3f".format(best), " worst: " +"%.3f".format(worst), " avg: " + "%.3f".format(average)," median: " + "%.3f".format(median), " Stddev: " + "%.3f".format(sd))(true)
+              collect(
+                "Best: " + "%.3f".format(best),
+                " worst: " +"%.3f".format(worst),
+                " avg: " + "%.3f".format(average),
+                " median: " + "%.3f".format(median),
+                " Stddev: " + "%.3f".format(sd))(true)
             }
           """
           
